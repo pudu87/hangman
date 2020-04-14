@@ -1,0 +1,24 @@
+---
+:counter: 2
+:guesses:
+- A
+- E
+- I
+- O
+- R
+- S
+- T
+- V
+- D
+- C
+:word:
+- D
+- E
+- C
+- O
+- R
+- A
+- T
+- I
+- N
+- G

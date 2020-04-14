@@ -1,8 +1,9 @@
+require 'yaml'
 require_relative 'graphics.rb'
 
 class Game
   include Graphics
-  attr_accessor :counter, :guesses, :word
+  attr_accessor :counter, :guesses, :word, :saves, :status
   
   def initialize
     @counter = 0
@@ -11,12 +12,12 @@ class Game
 
   def game
     intro
-    # load
     select_word
+    load
     show_gallow(counter)
     show_word
+    show_misses
     until finished?
-      # save
       insert_letter
       show_gallow(counter)
       show_word
@@ -28,32 +29,39 @@ class Game
   private
 
   def intro
-    puts "\n---WELCOME TO HANGMAN---\n"
+    puts "\n---WELCOME TO HANGMAN---\n\n"
   end
 
   def select_word
     dictionary = File.open('5desk.txt', 'r').readlines
-    dictionary.map! { |w| w.strip! }.select! { |w| (5..12).include?(w.size) }
+    dictionary.map!(&:strip!).select! { |w| (5..12).include?(w.size) }
     @word = dictionary.sample.upcase.split('')
   end
 
-  def finished?
-    counter == 6 || (word - guesses).empty?
+  def load
+    show_saves
+    puts "---Insert file# to LOAD---Or any other key to CONTINUE---"
+    file_nr = gets.chomp.to_i
+    execute_load(file_nr) if saves.include?(file_nr)
   end
 
-  def insert_letter
-    puts "\nChoose a letter:"
-    letter = gets.chomp.upcase
-    until valid?(letter)
-      puts "Invalid input. Try again."
-      letter = gets.chomp.upcase
-    end
-    guesses << letter
-    @counter +=1 unless word.include?(letter)
+  def show_saves
+    print 'File list: '
+    get_saves
+    saves.empty? ? (print "No files available.") : saves.each { |s| print "#{s}   " }
+    puts
   end
 
-  def valid?(letter)
-    letter.match?(/[a-zA-Z]/) && !guesses.include?(letter)
+  def get_saves
+    @saves = []
+    saved_files = Dir.entries('saves').select { |f| !File.directory? f }
+    saved_files.each { |s| saves << s.split('.')[0].to_i }
+    saves.sort!
+  end
+
+  def execute_load(file_nr)
+    @status = YAML::load(File.read("saves/#{file_nr}.txt"))
+    @counter, @guesses, @word = status[:counter], status[:guesses], status[:word]
   end
 
   def show_word
@@ -69,6 +77,45 @@ class Game
       (guesses - word).each { |l| print "#{l} "}
     end
     puts
+  end
+
+  def finished?
+    counter == 6 || (word - guesses).empty?
+  end
+
+  def insert_letter
+    letter = ''
+    puts "\nChoose a letter or type 'save':"
+    until valid_letter?(letter)
+      letter = gets.chomp.upcase
+      if letter == 'SAVE'
+        save
+      elsif !valid_letter?(letter)
+        puts "Invalid input. Try again."
+      end
+    end
+    guesses << letter
+    @counter +=1 unless word.include?(letter)
+  end
+
+  def valid_letter?(letter)
+    letter.match?(/^[a-zA-Z]{1}$/) && !guesses.include?(letter)
+  end
+
+  def save
+    get_saves
+    file_nr = get_file_nr
+    @status = { counter: counter, guesses: guesses, word: word }
+    File.open("saves/#{file_nr}.txt", 'w') { |f| f.write(YAML::dump(status)) }
+    puts "Game saved as '#{file_nr}.txt'---Choose a letter:"
+  end
+
+  def get_file_nr
+    file_nr = 1
+    while saves.include?(file_nr)
+      file_nr += 1
+    end
+    return file_nr
   end
 
   def outro
